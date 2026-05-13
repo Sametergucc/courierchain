@@ -15,10 +15,53 @@ export async function POST(req: NextRequest) {
     const userWallet = wallet || `user_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const userId = `u_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    // Var olan kullanıcıyı kontrol et (wallet ile)
     const existing = await fileDb.users.findByWallet(userWallet);
     if (existing) {
-      return NextResponse.json({ user: existing });
+      const nameTrim = name.trim();
+      const roleChanged = existing.role !== role;
+      const nameChanged = existing.name !== nameTrim;
+
+      if (!roleChanged && !nameChanged) {
+        return NextResponse.json({ user: existing });
+      }
+
+      let updated: DBUser = {
+        ...existing,
+        name: nameTrim,
+        role,
+      };
+
+      if (role === "courier") {
+        updated = {
+          ...updated,
+          priceSOL: parseFloat(priceSOL) || existing.priceSOL || 0.08,
+          available: true,
+          rating: existing.rating ?? 0,
+          deliveries: existing.deliveries ?? 0,
+          distance: existing.distance ?? "—",
+          lat:
+            existing.lat ??
+            41.008 + (Math.random() - 0.5) * 0.02,
+          lng:
+            existing.lng ??
+            28.978 + (Math.random() - 0.5) * 0.02,
+        };
+      } else {
+        const {
+          priceSOL: _p,
+          available: _a,
+          rating: _r,
+          deliveries: _d,
+          distance: _di,
+          ...rest
+        } = updated;
+        updated = rest as DBUser;
+        updated.role = "customer";
+        updated.name = nameTrim;
+      }
+
+      await fileDb.users.upsert(updated);
+      return NextResponse.json({ user: updated });
     }
 
     // Yeni kullanıcı oluştur

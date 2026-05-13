@@ -3,12 +3,16 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useJobs } from "@/lib/JobContext";
-import { explorerUrl, shortAddress } from "@/lib/solana";
+import { explorerUrl, shortAddress, tryPublicKey } from "@/lib/solana";
+import { getLiveDeliveryAmountSol } from "@/lib/constants";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { ToastManager, useToasts } from "@/components/ToastManager";
 import ThemeToggle from "@/components/ThemeToggle";
 import LangToggle from "@/components/LangToggle";
+import AppModeToggle from "@/components/AppModeToggle";
+import BrandMark from "@/components/BrandMark";
 import { useLang } from "@/lib/LangContext";
+import { useAppMode } from "@/lib/AppModeContext";
 
 interface QRData {
   job_id: string;
@@ -32,7 +36,11 @@ export default function ScanPage() {
   const { publicKey, sendTransaction, connected } = useWallet();
   const { connection } = useConnection();
   const { toasts, addToast, dismiss } = useToasts();
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  const { mode } = useAppMode();
+  const isLive = mode === "live";
+  const isEN = lang === "en";
+  const explorerCluster = isLive ? "mainnet" : "devnet";
 
   const stopScanner = useCallback(async () => {
     if (!scannerRef.current) return;
@@ -58,25 +66,58 @@ export default function ScanPage() {
         setState("success");
       } else {
         let sig: string | undefined;
-        if (publicKey && sendTransaction && job) {
+        const courierPk = job ? tryPublicKey(job.courierWallet) : null;
+        const deliverySol = getLiveDeliveryAmountSol();
+
+        if (isLive) {
+          if (!job) throw new Error(isEN ? "Job not found" : "İş bulunamadı");
+          if (!courierPk) {
+            setResult({ msg: t.liveInvalidCourierWallet });
+            setState("error");
+            return;
+          }
+          if (!connected || !publicKey || !sendTransaction) {
+            setResult({ msg: t.liveScanNeedWallet });
+            setState("error");
+            return;
+          }
           try {
-            const { Transaction, SystemProgram, PublicKey, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+            const { Transaction, SystemProgram, LAMPORTS_PER_SOL } = await import("@solana/web3.js");
+            const lamports = Math.round(deliverySol * LAMPORTS_PER_SOL);
             const tx = new Transaction().add(SystemProgram.transfer({
               fromPubkey: publicKey,
-              toPubkey: new PublicKey(job.courierWallet),
-              lamports: Math.round(0.001 * LAMPORTS_PER_SOL),
+              toPubkey: courierPk,
+              lamports,
             }));
-            const { blockhash } = await connection.getLatestBlockhash();
-            tx.recentBlockhash = blockhash; tx.feePayer = publicKey;
-            sig = await sendTransaction(tx, connection);
-            await connection.confirmTransaction(sig, "confirmed");
-          } catch { sig = `release_demo_${Date.now().toString(36)}`; }
-        } else { sig = `release_demo_${Date.now().toString(36)}`; }
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+            tx.recentBlockhash = blockhash;
+            tx.feePayer = publicKey;
+            sig = await sendTransaction(tx, connection, { skipPreflight: false });
+            await connection.confirmTransaction(
+              { signature: sig, blockhash, lastValidBlockHeight },
+              "confirmed"
+            );
+          } catch (e: any) {
+            const reason = e?.message ?? String(e);
+            addToast("error", `${t.liveDeliveryTxFailed} ${reason}`, undefined, 8000);
+            setResult({ msg: `${t.liveDeliveryTxFailed} ${reason}` });
+            setState("error");
+            return;
+          }
+        } else {
+          if (job && courierPk && !connected) {
+            addToast("error", t.walletNotConnected, undefined, 5000);
+          }
+          sig = `release_demo_${Date.now().toString(36)}`;
+        }
 
-        if (job) updateJobStatus(job.id, "delivered", sig);
+        if (job) updateJobStatus(job.id, "delivered", sig!);
         setResult({
-          msg: `${t.toastPaymentSent(job?.courierName ?? "Courier")} · ${job?.amountSOL.toFixed(4) ?? "?"} SOL`,
-          txSig: sig, type:"delivery",
+          msg: isLive
+            ? `${t.toastPaymentSent(job?.courierName ?? "Courier")} · ${deliverySol} SOL (Mainnet)`
+            : t.testDeliveryResultMsg(job?.courierName ?? "Courier", job?.amountSOL ?? 0),
+          txSig: sig,
+          type: "delivery",
         });
         setState("success");
       }
@@ -84,7 +125,7 @@ export default function ScanPage() {
       setState("error");
       setResult({ msg: e?.message ?? t.scanFailed });
     }
-  }, [getJobByHash, updateJobStatus, publicKey, sendTransaction, connection, t]);
+  }, [getJobByHash, updateJobStatus, publicKey, sendTransaction, connection, t, connected, addToast, isLive, isEN]);
 
   const startScanner = useCallback(async () => {
     setState("scanning"); setCamErr(null);
@@ -158,15 +199,22 @@ export default function ScanPage() {
           {t.backToMap}
         </Link>
 
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
           <div style={{
             display:"flex", alignItems:"center", gap:6,
             background:"var(--bg-input)", border:"1px solid var(--border-subtle)",
             borderRadius:10, padding:"5px 11px",
           }}>
-            <span style={{ width:6, height:6, borderRadius:"50%", background:"var(--green)", boxShadow:"0 0 6px var(--green)" }}/>
-            <span style={{ fontSize:"0.7rem", fontWeight:700, color:"var(--green)" }}>Devnet</span>
+            <span style={{
+              width:6, height:6, borderRadius:"50%",
+              background: isLive ? "#f87171" : "var(--green)",
+              boxShadow: isLive ? "0 0 6px #f87171" : "0 0 6px var(--green)",
+            }}/>
+            <span style={{ fontSize:"0.7rem", fontWeight:700, color: isLive ? "#f87171" : "var(--green)" }}>
+              {isLive ? (isEN ? "Mainnet" : "Mainnet") : "Devnet"}
+            </span>
           </div>
+          <AppModeToggle dense />
           <LangToggle />
           <ThemeToggle />
         </div>
@@ -175,14 +223,9 @@ export default function ScanPage() {
       {/* Page header */}
       <div style={{ maxWidth:480, margin:"0 auto 24px" }}>
         <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-          <div style={{
-            width:52, height:52, borderRadius:16,
-            background:"linear-gradient(135deg,var(--accent),#c76bff)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            fontSize:"1.5rem", boxShadow:"0 6px 20px var(--accent-glow)", flexShrink:0,
-          }}>📷</div>
-          <div>
-            <h1 className="gradient-text" style={{ fontSize:"1.5rem", fontWeight:900, lineHeight:1.1 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <BrandMark size="sm" muted style={{ display: "block", marginBottom: 4 }} />
+            <h1 style={{ fontSize:"1.35rem", fontWeight:800, lineHeight:1.15, color: "var(--text-primary)" }}>
               {t.scanTitle}
             </h1>
             <p style={{ fontSize:"0.8rem", color:"var(--text-muted)", marginTop:3 }}>
@@ -196,7 +239,8 @@ export default function ScanPage() {
       <div style={{ maxWidth:480, margin:"0 auto" }}>
         <div style={{
           background:"var(--bg-card)", border:"1px solid var(--border-default)",
-          borderRadius:24, overflow:"hidden", boxShadow:"var(--shadow-lg)",
+          borderRadius:24, overflow:"hidden",
+          boxShadow:"var(--shadow-lg)",
         }}>
           {/* Camera viewport */}
           <div style={{
@@ -214,7 +258,7 @@ export default function ScanPage() {
                 <p style={{ color:"var(--text-secondary)", fontSize:"0.85rem", marginBottom:20, lineHeight:1.5 }}>
                   {t.scanReady}
                 </p>
-                <button onClick={startScanner} className="btn-primary anim-glow"
+                <button onClick={startScanner} className="btn-primary"
                   style={{ padding:"12px 28px", borderRadius:12, fontSize:"0.85rem", cursor:"pointer",
                     display:"inline-flex", alignItems:"center", gap:8 }}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -301,7 +345,7 @@ export default function ScanPage() {
                   ))}
                 </div>
                 {result?.txSig && (
-                  <a href={explorerUrl(result.txSig)} target="_blank" rel="noopener noreferrer"
+                  <a href={explorerUrl(result.txSig, explorerCluster)} target="_blank" rel="noopener noreferrer"
                     style={{ display:"inline-flex", alignItems:"center", gap:5,
                       fontSize:"0.75rem", fontWeight:700, color:"var(--accent)", marginTop:10, textDecoration:"none" }}>
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

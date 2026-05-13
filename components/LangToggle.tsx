@@ -1,44 +1,60 @@
 "use client";
 
 import { useLang } from "@/lib/LangContext";
+import type { Lang } from "@/lib/i18n";
 
 export default function LangToggle() {
-  const { lang, toggle } = useLang();
-  const isEN = lang === "en";
+  const { lang, setLang } = useLang();
+
+  const seg = (code: Lang) => {
+    const active = lang === code;
+    return (
+      <button
+        type="button"
+        aria-pressed={active}
+        onClick={() => setLang(code)}
+        style={{
+          flex: 1,
+          padding: "6px 12px",
+          fontSize: "0.68rem",
+          fontWeight: 700,
+          letterSpacing: "0.08em",
+          border: "none",
+          cursor: "pointer",
+          fontFamily: "Inter, system-ui, sans-serif",
+          background: active ? "var(--text-primary)" : "transparent",
+          color: active ? "var(--bg-base)" : "var(--text-muted)",
+          transition: "background 0.15s, color 0.15s",
+        }}
+      >
+        {code.toUpperCase()}
+      </button>
+    );
+  };
 
   return (
-    <button
-      onClick={toggle}
-      title={isEN ? "Türkçe'ye geç" : "Switch to English"}
+    <div
+      role="group"
+      aria-label={lang === "tr" ? "Dil seçimi" : "Language"}
       style={{
         display: "flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "4px 9px",
         borderRadius: 10,
-        border: "1.5px solid var(--border-default)",
+        border: "1px solid var(--border-subtle)",
         background: "var(--bg-input)",
-        cursor: "pointer",
-        transition: "all 0.2s",
+        overflow: "hidden",
         flexShrink: 0,
       }}
     >
-      {/* Flag */}
-      <span style={{ fontSize: "0.9rem", lineHeight: 1 }}>
-        {isEN ? "🇹🇷" : "🇬🇧"}
-      </span>
-      {/* Label */}
-      <span
+      {seg("tr")}
+      <div
         style={{
-          fontSize: "0.68rem",
-          fontWeight: 700,
-          letterSpacing: "0.04em",
-          color: "var(--accent)",
-          fontFamily: "Inter, sans-serif",
+          width: 1,
+          alignSelf: "stretch",
+          background: "var(--border-subtle)",
+          flexShrink: 0,
         }}
-      >
-        {isEN ? "TR" : "EN"}
-      </span>
-    </button>
+      />
+      {seg("en")}
+    </div>
   );
 }

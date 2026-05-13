@@ -3,15 +3,18 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useAuth } from "@/lib/AuthContext";
 import { useLang } from "@/lib/LangContext";
+import { useAppMode } from "@/lib/AppModeContext";
 import { useUserLocation } from "@/lib/useLocation";
 import { db, DBJob } from "@/lib/db";
 import { shortAddress, explorerUrl, getSolBalance } from "@/lib/solana";
 import ThemeToggle from "@/components/ThemeToggle";
 import LangToggle from "@/components/LangToggle";
+import AppModeToggle from "@/components/AppModeToggle";
 import { ToastManager, useToasts } from "@/components/ToastManager";
+import CompactWalletConnect from "@/components/CompactWalletConnect";
 import JobTimeline from "@/components/JobTimeline";
 import { useIsMobile } from "@/lib/useIsMobile";
 
@@ -20,8 +23,12 @@ const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 export default function CourierPage() {
   const { user, logout, updateUser, loading: authLoading } = useAuth();
   const { lang } = useLang();
+  const { mode } = useAppMode();
+  const isLive = mode === "live";
+  const explorerCluster = isLive ? "mainnet" : "devnet";
   const router = useRouter();
   const { publicKey, connected } = useWallet();
+  const { connection } = useConnection();
   const { toasts, addToast, dismiss } = useToasts();
   const { location, coords, requestGPS } = useUserLocation();
 
@@ -35,6 +42,7 @@ export default function CourierPage() {
   const scannerRef = useRef<any>(null);
   const isEN = lang === "en";
   const isMobile = useIsMobile();
+  const sidebarWidth = isMobile ? 260 : 360;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -63,15 +71,15 @@ export default function CourierPage() {
   // Wallet bakiyesi
   useEffect(() => {
     if (connected && publicKey) {
-      getSolBalance(publicKey).then(b => setWalletBalance(b)).catch(() => setWalletBalance(0));
+      getSolBalance(publicKey, connection).then(b => setWalletBalance(b)).catch(() => setWalletBalance(0));
       const iv = setInterval(() => {
-        getSolBalance(publicKey).then(b => setWalletBalance(b)).catch(() => {});
+        getSolBalance(publicKey, connection).then(b => setWalletBalance(b)).catch(() => {});
       }, 15000);
       return () => clearInterval(iv);
     } else {
       setWalletBalance(null);
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, connection]);
 
   const accept = async (job: DBJob) => {
     try {
@@ -294,26 +302,21 @@ export default function CourierPage() {
       <aside
         className={`mobile-sidebar${mobileMenuOpen ? " open" : ""}`}
         style={{
-          width: 260, minWidth: 260, height: "100vh", position: "fixed",
+          width: sidebarWidth, minWidth: sidebarWidth, height: "100vh", position: "fixed",
           background: "var(--sidebar-bg)", borderRight: "1px solid var(--border-subtle)",
           display: "flex", flexDirection: "column", padding: "20px 14px",
         }}
       >
         {/* Logo */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: 12,
-            background: "linear-gradient(135deg,var(--green),#0fd47e)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem",
-            boxShadow: "0 4px 16px rgba(20,241,149,0.35)",
-          }}>🏍️</div>
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: "0.95rem", fontWeight: 900, color: "var(--text-primary)" }}>
               {isEN ? "Courier" : "Kurye"}
             </div>
             <div style={{ fontSize: "0.65rem", color: "var(--green)", fontWeight: 700 }}>{user.name}</div>
           </div>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <AppModeToggle dense />
             <LangToggle /><ThemeToggle />
           </div>
         </div>
@@ -342,8 +345,11 @@ export default function CourierPage() {
               )}
             </>
           ) : (
-            <span style={{ fontSize: "0.65rem", color: "#f59e0b", fontWeight: 600 }}>
-              🧪 {isEN ? "Demo mode" : "Demo modu"}
+            <span style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", width: "100%" }}>
+              <span style={{ fontSize: "0.65rem", color: "#f59e0b", fontWeight: 600 }}>
+                🧪 {isEN ? "Demo mode" : "Demo modu"}
+              </span>
+              <CompactWalletConnect style={{ marginLeft: "auto" }} />
             </span>
           )}
         </div>
@@ -424,7 +430,7 @@ export default function CourierPage() {
       {/* ── Main ── */}
       <main
         className="mobile-main-no-margin"
-        style={{ flex: 1, marginLeft: 260, padding: tab === "map" ? 0 : "24px 28px", height: "100vh", overflow: tab === "map" ? "hidden" : "auto" }}
+        style={{ flex: 1, marginLeft: sidebarWidth, padding: tab === "map" ? 0 : "24px 28px", height: "100vh", overflow: tab === "map" ? "hidden" : "auto" }}
       >
 
         {/* ── MAP TAB ── */}
@@ -638,7 +644,7 @@ export default function CourierPage() {
                         </button>
                       )}
                       {job.txSignature && (
-                        <a href={explorerUrl(job.txSignature)} target="_blank" rel="noopener noreferrer"
+                        <a href={explorerUrl(job.txSignature, explorerCluster)} target="_blank" rel="noopener noreferrer"
                           style={{
                             padding: "10px 14px", borderRadius: 12, fontSize: "0.78rem",
                             background: "var(--bg-input)", border: "1px solid var(--border-subtle)",

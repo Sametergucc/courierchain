@@ -33,12 +33,47 @@ const _TRANSLATIONS: Record<Lang, T> = {
 
     // ── Hire button ───────────────────────────────────────────────────────
     connectWalletFirst: "Önce Cüzdan Bağla",
+    liveWalletBanner:
+      "Canlı mod: escrow için uygulama içinden cüzdan gerekli. Mod değişince veya sayfa yenilendiğinde Phantom’da tekrar onaylayın; ağ Mainnet olmalı. Kenarda 🔗 Cüzdan’a tıklayın.",
     selectCourier:      "Kurye Seç",
     lockSol:            "SOL Kilitle",
     processing:         "İşleniyor…",
 
     // ── Wallet ───────────────────────────────────────────────────────────
-    connectPhantom:  "Phantom Bağla",
+    connectPhantom:  "Cüzdan bağla",
+    connectWalletShort: "🔗 Cüzdan",
+    authWalletOptionalTitle: "Cüzdan (isteğe bağlı)",
+    authWalletOptionalBody:
+      "Önce uygulamayı keşfedebilirsin. Gerçek Solana Devnet işlemi (QR ile teslimatta mikro transfer) istiyorsan Phantom veya Solflare ile burada bağlan.",
+    authRoleHint: "Cüzdanı atlayıp demo ile başlayabilir; istersen profil adımında bağlarsın.",
+    authFooterInfo:
+      "Demo: cüzdansız tam akış. Zincir: teslim QR’ında cüzdan bağlıysan küçük bir devnet transferi; Phantom’da ağın Devnet olduğundan emin ol.",
+    modeGroupLabel: "Çalışma modu",
+    modeTest: "Test",
+    modeLive: "Canlı",
+    modeSwitchLiveConfirm:
+      "CANLI MOD (Solana Mainnet): Gerçek SOL harcanır. Phantom/Solflare ağını Mainnet yap. Escrow için .env içinde NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS tanımlı olmalı. Devam edilsin mi?",
+    liveEscrowNotConfigured:
+      "Canlı mod: .env içinde NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS (Mainnet escrow cüzdanı) tanımlı değil.",
+    liveNeedWalletHire: "Canlı modda kurye kiralamak için önce cüzdanını bağla.",
+    liveInvalidCourierWallet:
+      "Canlı mod: Bu kuryenin geçerli bir Solana adresi yok; başka kurye dene veya kurye kaydında gerçek adres kullan.",
+    liveInsufficientSol: (have: number, need: number) =>
+      `Mainnet bakiyen yetersiz: yaklaşık ${have.toFixed(4)} SOL var, bu ödeme için en az ~${need.toFixed(4)} SOL gerekir (tutar + ağ ücreti). Cüzdana SOL yükleyip tekrar dene.`,
+    liveSimulationLikelyBalance:
+      "Phantom simülasyonu sık sık yetersiz SOL veya ağ ücreti nedeniyle reddeder. Mainnet’te bağlı adreste yeterli SOL olduğundan emin ol.",
+    testInsufficientSol: (have: number, need: number) =>
+      `Devnet bakiyen yetersiz: yaklaşık ${have.toFixed(4)} SOL var, bu ödeme için en az ~${need.toFixed(4)} SOL gerekir (faucet ile test SOL al).`,
+    testInvalidCourierWallet:
+      "Test (Devnet): Bu kuryenin geçerli Solana adresi yok; kurye kaydında gerçek cüzdan kullan veya başka kurye seç.",
+    testSimulationLikelyBalance:
+      "Simülasyon reddi: Phantom’da ağın Devnet olduğundan ve hesabında yeterli test SOL olduğundan emin ol.",
+    testWalletHintBanner:
+      "Test (Devnet): 🔗 Cüzdan bağlıysan kirala dediğinde test SOL doğrudan seçtiğin kuryenin cüzdanına gider; teslimatta ikinci ödeme olmaz.",
+    testDeliveryResultMsg: (courierName: string, amountSol: number) =>
+      `Teslim onaylandı · ${courierName}. Ödeme test modunda kirala adımında kurye cüzdanına gitmişti (~${amountSol.toFixed(4)} SOL).`,
+    liveScanNeedWallet: "Canlı modda teslimat onayı için cüzdan bağlı olmalı.",
+    liveDeliveryTxFailed: "Teslimat ödemesi zincir üstü tamamlanamadı — işlem durumu güncellenmedi.",
     connected:       "Bağlandı",
     disconnect:      "Bağlantıyı Kes",
     balance:         "Bakiye",
@@ -145,12 +180,47 @@ const _TRANSLATIONS: Record<Lang, T> = {
 
     // ── Hire button ───────────────────────────────────────────────────────
     connectWalletFirst: "Connect Wallet",
+    liveWalletBanner:
+      "Live mode: connect inside the app for escrow. After a mode switch or refresh, approve again in Phantom; network must be Mainnet. Use 🔗 Wallet in the sidebar.",
     selectCourier:      "Select a Courier",
     lockSol:            "Lock SOL",
     processing:         "Processing…",
 
     // ── Wallet ───────────────────────────────────────────────────────────
-    connectPhantom:  "Connect Phantom",
+    connectPhantom:  "Connect wallet",
+    connectWalletShort: "🔗 Wallet",
+    authWalletOptionalTitle: "Wallet (optional)",
+    authWalletOptionalBody:
+      "Explore the app first. For real Solana Devnet actions (micro-transfer on delivery QR), connect Phantom or Solflare here.",
+    authRoleHint: "Skip the wallet and try the demo; you can connect on the profile step if you want.",
+    authFooterInfo:
+      "Demo: full flow without a wallet. On-chain: with a connected wallet, delivery scan sends a tiny devnet transfer — set your wallet network to Devnet.",
+    modeGroupLabel: "App mode",
+    modeTest: "Test",
+    modeLive: "Live",
+    modeSwitchLiveConfirm:
+      "LIVE MODE (Solana Mainnet): You will spend REAL SOL. Set Phantom/Solflare to Mainnet. You must define NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS in .env for escrow. Continue?",
+    liveEscrowNotConfigured:
+      "Live mode: NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS is not set in .env.",
+    liveNeedWalletHire: "Live mode: connect your wallet before hiring a courier.",
+    liveInvalidCourierWallet:
+      "Live mode: this courier has no valid Solana address — pick another or register with a real wallet.",
+    liveInsufficientSol: (have: number, need: number) =>
+      `Insufficient Mainnet balance: ~${have.toFixed(4)} SOL available, need at least ~${need.toFixed(4)} SOL (amount + network fee). Fund the wallet and try again.`,
+    liveSimulationLikelyBalance:
+      "Simulation often fails from too little SOL for the payment plus fees. Ensure this Mainnet account is funded.",
+    testInsufficientSol: (have: number, need: number) =>
+      `Insufficient Devnet balance: ~${have.toFixed(4)} SOL available, need at least ~${need.toFixed(4)} SOL (amount + fee). Use a faucet for test SOL.`,
+    testInvalidCourierWallet:
+      "Test (Devnet): this courier has no valid Solana address — use a real wallet on courier signup or pick another courier.",
+    testSimulationLikelyBalance:
+      "Simulation failed: confirm your wallet network is Devnet and you have enough test SOL.",
+    testWalletHintBanner:
+      "Test (Devnet): with 🔗 Wallet, Hire sends test SOL to the courier you pick; delivery scan only confirms — no second payment.",
+    testDeliveryResultMsg: (courierName: string, amountSol: number) =>
+      `Delivery confirmed · ${courierName}. In Test mode, payment already went to the courier at Hire (~${amountSol.toFixed(4)} SOL).`,
+    liveScanNeedWallet: "Live mode: wallet must be connected to confirm delivery payment.",
+    liveDeliveryTxFailed: "On-chain delivery payment failed — job status was not updated.",
     connected:       "Connected",
     disconnect:      "Disconnect",
     balance:         "Balance",
@@ -256,6 +326,28 @@ export type T = {
   lockSol: string;
   processing: string;
   connectPhantom: string;
+  connectWalletShort: string;
+  authWalletOptionalTitle: string;
+  authWalletOptionalBody: string;
+  authRoleHint: string;
+  authFooterInfo: string;
+  modeGroupLabel: string;
+  modeTest: string;
+  modeLive: string;
+  modeSwitchLiveConfirm: string;
+  liveEscrowNotConfigured: string;
+  liveNeedWalletHire: string;
+  liveInvalidCourierWallet: string;
+  liveInsufficientSol: (have: number, need: number) => string;
+  liveSimulationLikelyBalance: string;
+  testInsufficientSol: (have: number, need: number) => string;
+  testInvalidCourierWallet: string;
+  testSimulationLikelyBalance: string;
+  testWalletHintBanner: string;
+  testDeliveryResultMsg: (courierName: string, amountSol: number) => string;
+  liveScanNeedWallet: string;
+  liveDeliveryTxFailed: string;
+  liveWalletBanner: string;
   connected: string;
   disconnect: string;
   balance: string;

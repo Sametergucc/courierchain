@@ -12,12 +12,16 @@
   --bg-hover:       rgba(153,69,255,0.09);
   --bg-selected:    rgba(153,69,255,0.14);
   --border-subtle:  rgba(255,255,255,0.06);
-  --border-default: rgba(153,69,255,0.18);
-  --border-accent:  rgba(153,69,255,0.45);
+  --border-default: rgba(255,255,255,0.1);
+  --border-accent:  rgba(255,255,255,0.2);
   --text-primary:   #f0f0ff;
   --text-secondary: #9898b8;
   --text-muted:     #55556a;
   --text-inverse:   #07070f;
+  /* Marka — logodaki sıcak amber */
+  --brand:          #f0b429;
+  --brand-dim:      rgba(240,180,41,0.16);
+  --brand-glow:     rgba(240,180,41,0.38);
   --accent:         #9945FF;
   --accent-dim:     rgba(153,69,255,0.15);
   --accent-glow:    rgba(153,69,255,0.4);
@@ -45,14 +49,17 @@ html[data-theme="dark"] {
   --bg-selected:    rgba(153,69,255,0.14);
 
   --border-subtle:  rgba(255,255,255,0.06);
-  --border-default: rgba(153,69,255,0.18);
-  --border-accent:  rgba(153,69,255,0.45);
+  --border-default: rgba(255,255,255,0.1);
+  --border-accent:  rgba(255,255,255,0.22);
 
   --text-primary:   #f0f0ff;
   --text-secondary: #9898b8;
   --text-muted:     #55556a;
   --text-inverse:   #07070f;
 
+  --brand:          #f5bc34;
+  --brand-dim:      rgba(245,188,52,0.18);
+  --brand-glow:     rgba(245,188,52,0.42);
   --accent:         #9945FF;
   --accent-dim:     rgba(153,69,255,0.15);
   --accent-glow:    rgba(153,69,255,0.4);
@@ -72,24 +79,27 @@ html[data-theme="dark"] {
 
 /* ─── LIGHT THEME (applied on <html data-theme="light">) ───────────────────── */
 html[data-theme="light"] {
-  --bg-base:        #f0eeff;
-  --bg-surface:     #f8f6ff;
+  --bg-base:        #f5f2eb;
+  --bg-surface:     #faf8f4;
   --bg-elevated:    #ffffff;
-  --bg-card:        rgba(255, 255, 255, 0.9);
-  --bg-glass:       rgba(255, 255, 255, 0.75);
+  --bg-card:        rgba(255, 255, 255, 0.92);
+  --bg-glass:       rgba(255, 255, 255, 0.78);
   --bg-input:       rgba(0,0,0,0.04);
   --bg-hover:       rgba(153,69,255,0.07);
   --bg-selected:    rgba(153,69,255,0.10);
 
   --border-subtle:  rgba(0,0,0,0.07);
-  --border-default: rgba(153,69,255,0.2);
-  --border-accent:  rgba(153,69,255,0.5);
+  --border-default: rgba(0,0,0,0.1);
+  --border-accent:  rgba(0,0,0,0.16);
 
   --text-primary:   #1a1030;
   --text-secondary: #6b6890;
   --text-muted:     #a0a0c0;
   --text-inverse:   #f0f0ff;
 
+  --brand:          #d9a008;
+  --brand-dim:      rgba(217,160,8,0.14);
+  --brand-glow:     rgba(217,160,8,0.28);
   --accent:         #7c28ff;
   --accent-dim:     rgba(124,40,255,0.10);
   --accent-glow:    rgba(124,40,255,0.25);
@@ -117,6 +127,11 @@ html, body {
   background: var(--bg-base);
   color: var(--text-primary);
   overflow-x: hidden;
+}
+
+body {
+  position: relative;
+  isolation: isolate;
 }
 
 .theme-root {
@@ -175,8 +190,8 @@ html, body {
   to   { opacity:1; transform:translateX(0); }
 }
 @keyframes glow-pulse {
-  0%,100% { box-shadow: 0 0 8px var(--accent-glow); }
-  50%      { box-shadow: 0 0 28px var(--accent-glow), 0 0 60px var(--accent-dim); }
+  0%,100% { box-shadow: 0 0 0 1px var(--border-subtle); }
+  50%      { box-shadow: 0 0 0 1px var(--border-default); }
 }
 @keyframes ping {
   0%   { transform:scale(1); opacity:0.6; }
@@ -198,9 +213,9 @@ html, body {
 .anim-glow     { animation: glow-pulse 2.4s ease-in-out infinite; }
 .anim-shimmer  {
   background: linear-gradient(90deg,
-    rgba(153,69,255,0.04) 25%,
-    rgba(153,69,255,0.12) 50%,
-    rgba(153,69,255,0.04) 75%);
+    transparent 40%,
+    color-mix(in srgb, var(--text-primary) 6%, transparent) 50%,
+    transparent 60%);
   background-size: 200% 100%;
   animation: shimmer 1.8s infinite;
 }
@@ -234,25 +249,18 @@ html, body {
 
 /* ─── BUTTONS ────────────────────────────────────────────────────────────── */
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #7c28ff);
-  color: var(--text-inverse);
-  font-weight: 700;
-  border: none;
+  background: var(--text-primary);
+  color: var(--bg-base);
+  font-weight: 600;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.22s cubic-bezier(.22,1,.36,1);
-  position: relative;
-  overflow: hidden;
+  transition: opacity 0.2s, transform 0.18s, box-shadow 0.2s;
 }
-.btn-primary::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.2s;
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+  opacity: 0.95;
 }
-.btn-primary:hover::after  { opacity: 1; }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 28px var(--accent-glow); }
 .btn-primary:active { transform: translateY(0); }
 .btn-primary:disabled { opacity: 0.38; cursor: not-allowed; transform: none; box-shadow: none; }
 
@@ -283,8 +291,8 @@ html, body {
   content: '';
   position: absolute;
   left: 0; top: 0; bottom: 0;
-  width: 3px;
-  background: var(--accent);
+  width: 2px;
+  background: var(--text-secondary);
   border-radius: 0 2px 2px 0;
   opacity: 0;
   transition: opacity 0.2s;
@@ -388,11 +396,17 @@ html, body {
 .address-bar:hover { border-color: var(--border-default); }
 
 /* ─── GRADIENT TEXT ──────────────────────────────────────────────────────── */
-.gradient-text {
-  background: linear-gradient(130deg, var(--accent) 0%, #c76bff 50%, var(--green) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+/* Eski sınıf adı uyumluluğu — düz tipografi */
+.gradient-text,
+.brand-mark {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  color: var(--text-primary);
+  -webkit-text-fill-color: currentColor;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
 }
 
 /* ─── TIMELINE ───────────────────────────────────────────────────────────── */
@@ -494,25 +508,19 @@ html, body {
     height: 46px;
     padding: 0;
     border-radius: 14px;
-    background: linear-gradient(135deg, var(--accent), #c76bff);
-    border: 1.5px solid rgba(255, 255, 255, 0.18);
-    color: #ffffff;
+    background: var(--text-primary);
+    border: 1px solid var(--border-subtle);
+    color: var(--bg-base);
     cursor: pointer;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(10px);
-    box-shadow:
-      0 8px 24px rgba(153, 69, 255, 0.45),
-      0 2px 6px rgba(0, 0, 0, 0.3),
-      inset 0 1px 0 rgba(255, 255, 255, 0.18);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.25s ease;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
   }
   .mobile-hamburger:hover {
     transform: translateY(-1px);
-    box-shadow:
-      0 10px 28px rgba(153, 69, 255, 0.55),
-      0 2px 6px rgba(0, 0, 0, 0.35),
-      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    opacity: 0.92;
   }
   .mobile-hamburger:active {
     transform: scale(0.94);

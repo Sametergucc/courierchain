@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import WalletContextProvider from "@/components/WalletProvider";
+import { AppModeProvider } from "@/lib/AppModeContext";
 import { JobProvider } from "@/lib/JobContext";
 import { ThemeProvider } from "@/lib/ThemeContext";
 import { LangProvider } from "@/lib/LangContext";
@@ -27,13 +28,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body style={{ margin: 0 }}>
         <ThemeProvider>
           <LangProvider>
-            <WalletContextProvider>
-              <AuthProvider>
-                <JobProvider>
-                  {children}
-                </JobProvider>
-              </AuthProvider>
-            </WalletContextProvider>
+            <AppModeProvider>
+              <WalletContextProvider>
+                <AuthProvider>
+                  <JobProvider>
+                    {children}
+                  </JobProvider>
+                </AuthProvider>
+              </WalletContextProvider>
+            </AppModeProvider>
           </LangProvider>
         </ThemeProvider>
       </body>

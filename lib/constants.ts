@@ -50,8 +50,35 @@ export const COURIERS = [
   },
 ];
 
-// Mock escrow address on devnet
-export const ESCROW_ADDRESS = "EscroWcHainfwFvnc1UMTrjfYcmaDJQN3S4MrkkdnfQP";
+// Varsayılan devnet escrow alıcı adresi (canlı modda kullanılmaz)
+export const ESCROW_ADDRESS_DEVNET =
+  "EscroWcHainfwFvnc1UMTrjfYcmaDJQN3S4MrkkdnfQP";
+
+/** Geriye dönük uyumluluk */
+export const ESCROW_ADDRESS = ESCROW_ADDRESS_DEVNET;
+
+/** Test: devnet escrow. Canlı: NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS (zorunlu). */
+export function getEscrowAddress(live: boolean): string {
+  if (live) {
+    const m = process.env.NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS;
+    if (!m?.trim()) {
+      throw new Error("NEXT_PUBLIC_MAINNET_ESCROW_ADDRESS is not set");
+    }
+    return m.trim();
+  }
+  return (
+    process.env.NEXT_PUBLIC_DEVNET_ESCROW_ADDRESS?.trim() || ESCROW_ADDRESS_DEVNET
+  );
+}
+
+/** Canlı modda teslimat QR’ında kuryeye gönderilecek SOL (varsayılan 0.001, tavan 1). */
+export function getLiveDeliveryAmountSol(): number {
+  const raw = process.env.NEXT_PUBLIC_LIVE_DELIVERY_SOL;
+  if (!raw) return 0.001;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0.001;
+  return Math.min(n, 1);
+}
 
 // Istanbul center
 export const MAP_CENTER: [number, number] = [41.0082, 28.9784];
@@ -60,6 +87,21 @@ export const MAP_ZOOM = 13;
 // Solana RPC
 export const SOLANA_RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
+
+/**
+ * Canlı Mainnet: `MAINNET_RPC_UPSTREAM` — proxy’nin sunucuda ilettiği gerçek HTTP RPC
+ * (`/api/solana-mainnet`). İstemci varsayılanı `next.config` → `NEXT_PUBLIC_SOLANA_MAINNET_PROXY_URL`.
+ * Doğrudan dış RPC: `NEXT_PUBLIC_MAINNET_RPC`.
+ */
+export const MAINNET_RPC_UPSTREAM_DEFAULT =
+  "https://solana-rpc.publicnode.com";
+
+/** Proxy birincil upstream düşerse sırayla denenir (sunucu tarafı). */
+export const MAINNET_RPC_UPSTREAM_FALLBACKS: readonly string[] = [
+  "https://rpc.ankr.com/solana",
+  "https://solana-mainnet.rpc.extrnode.com",
+  "https://api.mainnet-beta.solana.com",
+];
 
 export type RentalType = "once" | "daily" | "weekly" | "monthly";
 

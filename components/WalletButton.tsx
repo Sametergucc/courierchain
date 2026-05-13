@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { getSolBalance, shortAddress } from "@/lib/solana";
 import { useLang } from "@/lib/LangContext";
 
 export default function WalletButton() {
   const { publicKey, connected, disconnect } = useWallet();
+  const { connection } = useConnection();
   const { setVisible } = useWalletModal();
   const [balance, setBalance] = useState<number | null>(null);
   const [copied, setCopied]   = useState(false);
@@ -15,10 +16,10 @@ export default function WalletButton() {
 
   useEffect(() => {
     if (!publicKey) { setBalance(null); return; }
-    getSolBalance(publicKey).then(setBalance);
-    const interval = setInterval(() => getSolBalance(publicKey).then(setBalance), 15000);
+    getSolBalance(publicKey, connection).then(setBalance);
+    const interval = setInterval(() => getSolBalance(publicKey, connection).then(setBalance), 15000);
     return () => clearInterval(interval);
-  }, [publicKey]);
+  }, [publicKey, connection]);
 
   const copyAddress = () => {
     if (!publicKey) return;
@@ -31,7 +32,7 @@ export default function WalletButton() {
     return (
       <button
         onClick={() => setVisible(true)}
-        className="btn-primary anim-glow"
+        className="btn-primary"
         style={{ width:"100%", padding:"13px 0", borderRadius:14, fontSize:"0.85rem",
           display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}
       >

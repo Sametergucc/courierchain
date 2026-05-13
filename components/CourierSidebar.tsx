@@ -16,6 +16,12 @@ interface CourierSidebarProps {
   hasActiveJob?: boolean;
   /** Kullanıcı konumu — mesafe hesaplaması için */
   userLocation?: [number, number];
+  /** Test modda cüzdan yokken: gerçek Devnet escrow için bağla */
+  showTestWalletHint?: boolean;
+  /** Canlı modda cüzdan yokken gösterilen uyarı */
+  showLiveWalletBanner?: boolean;
+  /** Canlı modda kirala butonu kilitli */
+  liveHireBlocked?: boolean;
 }
 
 function Stars({ rating }: { rating: number }) {
@@ -58,6 +64,8 @@ const RENTAL_KEYS: RentalType[] = ["once","daily","weekly","monthly"];
 export default function CourierSidebar({
   selectedCourier, onSelectCourier, rentalType,
   onRentalTypeChange, onHire, hiring, hasActiveJob, userLocation,
+  showLiveWalletBanner, liveHireBlocked,
+  showTestWalletHint,
 }: CourierSidebarProps) {
   const solPrice = useSolPrice();
   const { t, lang } = useLang();
@@ -125,6 +133,26 @@ export default function CourierSidebar({
 
   return (
     <div style={{ display:"flex", flexDirection:"column", gap:20, padding:"16px 14px", height:"100%" }}>
+
+      {showTestWalletHint && (
+        <div style={{
+          fontSize:"0.68rem", lineHeight:1.45, fontWeight:600,
+          color:"var(--green)", padding:"10px 12px", borderRadius:12,
+          background:"color-mix(in srgb, var(--green) 12%, transparent)", border:"1px solid color-mix(in srgb, var(--green) 28%, transparent)",
+        }}>
+          {t.testWalletHintBanner}
+        </div>
+      )}
+
+      {showLiveWalletBanner && (
+        <div style={{
+          fontSize:"0.68rem", lineHeight:1.45, fontWeight:600,
+          color:"#f87171", padding:"10px 12px", borderRadius:12,
+          background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.25)",
+        }}>
+          {t.liveWalletBanner}
+        </div>
+      )}
 
       {/* ── Couriers ── */}
       <div>
@@ -281,8 +309,8 @@ export default function CourierSidebar({
       {/* ── Hire button ── */}
       <button
         onClick={onHire}
-        disabled={!selectedCourier || hiring || hasActiveJob}
-        className="btn-primary anim-glow"
+        disabled={!selectedCourier || hiring || hasActiveJob || liveHireBlocked}
+        className="btn-primary"
         style={{
           marginTop:"auto", padding:"14px 0", borderRadius:14, fontSize:"0.85rem",
           display:"flex", alignItems:"center", justifyContent:"center", gap:8,

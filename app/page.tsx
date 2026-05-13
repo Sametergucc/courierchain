@@ -3,20 +3,24 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import CourierSidebar from "@/components/CourierSidebar";
 import QRModal from "@/components/QRModal";
 import { QRCodeCanvas } from "qrcode.react";
 import ThemeToggle from "@/components/ThemeToggle";
 import LangToggle from "@/components/LangToggle";
+import AppModeToggle from "@/components/AppModeToggle";
 import { ToastManager, useToasts } from "@/components/ToastManager";
 import { useSolPrice } from "@/lib/useSolPrice";
 import { useLang } from "@/lib/LangContext";
 import { useAuth } from "@/lib/AuthContext";
 import { useUserLocation } from "@/lib/useLocation";
 import { db, DBUser } from "@/lib/db";
-import { RENTAL_MULTIPLIERS, RentalType } from "@/lib/constants";
-import { shortAddress, explorerUrl, getSolBalance } from "@/lib/solana";
+import { RENTAL_MULTIPLIERS, RentalType, getEscrowAddress } from "@/lib/constants";
+import CompactWalletConnect from "@/components/CompactWalletConnect";
+import BrandMark from "@/components/BrandMark";
+import { shortAddress, explorerUrl, getSolBalance, lockToEscrow, tryPublicKey, InsufficientSolForEscrowError } from "@/lib/solana";
+import { useAppMode } from "@/lib/AppModeContext";
 import { useIsMobile } from "@/lib/useIsMobile";
 
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
@@ -45,26 +49,31 @@ type PickMode = "none" | "pickup" | "delivery";
 export default function HomePage() {
   const solPrice = useSolPrice();
   const { t, lang } = useLang();
+  const { mode } = useAppMode();
   const { user, logout, loading } = useAuth();
   const router = useRouter();
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, sendTransaction } = useWallet();
+  const { connection } = useConnection();
   const { location, coords, requestGPS, setManualLocation } = useUserLocation();
   const [locationPickMode, setLocationPickMode] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const isEN = lang === "en";
 
+  const isLive = mode === "live";
+  const explorerCluster = isLive ? "mainnet" : "devnet";
+
   // Cüzdan bakiyesini çek
   useEffect(() => {
     if (connected && publicKey) {
-      getSolBalance(publicKey).then(b => setWalletBalance(b)).catch(() => setWalletBalance(0));
+      getSolBalance(publicKey, connection).then(b => setWalletBalance(b)).catch(() => setWalletBalance(0));
       const iv = setInterval(() => {
-        getSolBalance(publicKey).then(b => setWalletBalance(b)).catch(() => {});
+        getSolBalance(publicKey, connection).then(b => setWalletBalance(b)).catch(() => {});
       }, 15000);
       return () => clearInterval(iv);
     } else {
       setWalletBalance(null);
     }
-  }, [connected, publicKey]);
+  }, [connected, publicKey, connection]);
 
   // Auth guard
   useEffect(() => {
@@ -105,6 +114,8 @@ export default function HomePage() {
 
   const { toasts, addToast, dismiss } = useToasts();
   const isMobile = useIsMobile();
+  /** Masaüstünde daha geniş panel */
+  const sidebarWidth = isMobile ? 292 : 400;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mapVisible, setMapVisible] = useState(false);
   useEffect(() => { if (!isMobile) setMobileMenuOpen(false); }, [isMobile]);
@@ -136,8 +147,83 @@ export default function HomePage() {
 
     try {
       const amount = (selectedCourier.priceSOL || 0.08) * RENTAL_MULTIPLIERS[rentalType];
-      const txSig = `demo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       const jobHash = `hash_${Date.now().toString(36)}`;
+
+      let txSig: string;
+
+      if (isLive) {
+        if (!publicKey || !sendTransaction) {
+          dismiss(pid);
+          addToast("error", t.liveNeedWalletHire);
+          return;
+        }
+        let escrowAddr: string;
+        try {
+          escrowAddr = getEscrowAddress(true);
+        } catch {
+          dismiss(pid);
+          addToast("error", t.liveEscrowNotConfigured);
+          return;
+        }
+        if (!tryPublicKey(selectedCourier.wallet)) {
+          dismiss(pid);
+          addToast("error", t.liveInvalidCourierWallet);
+          return;
+        }
+        try {
+          txSig = await lockToEscrow(
+            publicKey,
+            sendTransaction,
+            escrowAddr,
+            amount,
+            jobHash,
+            connection
+          );
+        } catch (e: unknown) {
+          dismiss(pid);
+          if (e instanceof InsufficientSolForEscrowError) {
+            addToast("error", t.liveInsufficientSol(e.haveSol, e.needSol));
+            return;
+          }
+          const msg = e instanceof Error ? e.message : String(e);
+          const simHint = /simulation|reverted|simulate/i.test(msg)
+            ? ` ${t.liveSimulationLikelyBalance}`
+            : "";
+          addToast("error", `${t.toastFailed} ${msg}${simHint}`);
+          return;
+        }
+      } else if (publicKey && sendTransaction) {
+        if (!tryPublicKey(selectedCourier.wallet)) {
+          dismiss(pid);
+          addToast("error", t.testInvalidCourierWallet);
+          return;
+        }
+        /* Test (Devnet): gerçek ödeme doğrudan kurye cüzdanına gider (escrow anahtarı olmadan teslimatta serbest bırakılamaz). */
+        try {
+          txSig = await lockToEscrow(
+            publicKey,
+            sendTransaction,
+            selectedCourier.wallet,
+            amount,
+            jobHash,
+            connection
+          );
+        } catch (e: unknown) {
+          dismiss(pid);
+          if (e instanceof InsufficientSolForEscrowError) {
+            addToast("error", t.testInsufficientSol(e.haveSol, e.needSol));
+            return;
+          }
+          const msg = e instanceof Error ? e.message : String(e);
+          const simHint = /simulation|reverted|simulate/i.test(msg)
+            ? ` ${t.testSimulationLikelyBalance}`
+            : "";
+          addToast("error", `${t.toastFailed} ${msg}${simHint}`);
+          return;
+        }
+      } else {
+        txSig = `demo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      }
 
       const job = await db.jobs.create({
         customerWallet: user.wallet,
@@ -176,13 +262,13 @@ export default function HomePage() {
       dismiss(pid);
       const usdStr = solPrice ? ` ≈ $${(amount * solPrice).toFixed(2)}` : "";
       addToast("success", t.toastLocked(selectedCourier.name),
-        { href: explorerUrl(txSig), label: t.toastExplorer }, 8000,
+        { href: explorerUrl(txSig, explorerCluster), label: t.toastExplorer }, 8000,
         { amount: `${amount.toFixed(4)} SOL${usdStr}`, sub: `tx: ${shortAddress(txSig)}` });
     } catch (e: any) {
       dismiss(pid);
       addToast("error", `${t.toastFailed} ${e?.message ?? "Unknown"}`);
     } finally { setHiring(false); }
-  }, [hiring, selectedCourier, user, rentalType, pickupPoint, deliveryPoint, addToast, dismiss, solPrice, t, isEN]);
+  }, [hiring, selectedCourier, user, rentalType, pickupPoint, deliveryPoint, addToast, dismiss, solPrice, t, isEN, isLive, publicKey, sendTransaction, connection, explorerCluster]);
 
   const statusLabel =
     activeJob?.status === "escrowed"  ? t.escrowed :
@@ -190,6 +276,8 @@ export default function HomePage() {
 
   // Aktif job durumunu + paketlerimi periyodik kontrol et
   const prevJobStatusRef = useRef<Record<string, string>>({});
+  const activeJobRef = useRef<ActiveJob | null>(null);
+  activeJobRef.current = activeJob;
 
   useEffect(() => {
     if (!user) return;
@@ -242,19 +330,20 @@ export default function HomePage() {
         for (const job of jobs) newMap[job.id] = job.status;
         prevJobStatusRef.current = newMap;
 
-        // ActiveJob senkronizasyonu
-        if (activeJob) {
-          const current = jobs.find(j => j.id === activeJob.id);
-          if (current && current.status !== activeJob.status) {
+        // ActiveJob senkronizasyonu (activeJob deps’te olmasın diye ref — interval sürekli sıfırlanmasın)
+        const aj = activeJobRef.current;
+        if (aj) {
+          const current = jobs.find(j => j.id === aj.id);
+          if (current && current.status !== aj.status) {
             setActiveJob(prev => prev ? { ...prev, status: current.status } : null);
           }
         }
       } catch {}
     };
     poll();
-    const iv = setInterval(poll, 2000); // 2 saniyede bir kontrol (daha hızlı)
+    const iv = setInterval(poll, 4000);
     return () => clearInterval(iv);
-  }, [activeJob, user, addToast, isEN, solPrice]);
+  }, [user, addToast, isEN, solPrice]);
 
   // ── Live courier position polling (for navigation mode) ──
   useEffect(() => {
@@ -380,7 +469,7 @@ export default function HomePage() {
       <aside
         className={`sidebar mobile-sidebar${mobileMenuOpen ? " open" : ""}`}
         style={{
-          width:292, minWidth:292, height:"100%",
+          width: sidebarWidth, minWidth: sidebarWidth, height:"100%",
           display:"flex", flexDirection:"column",
           position:"fixed", zIndex:40, left:0, top:0,
         }}
@@ -388,21 +477,14 @@ export default function HomePage() {
         {/* ── Logo bar ── */}
         <div style={{ padding:"18px 16px 14px", borderBottom:"1px solid var(--border-subtle)" }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
-            <div style={{
-              width:38, height:38, borderRadius:12,
-              background:"linear-gradient(135deg,var(--accent),#c76bff)",
-              display:"flex", alignItems:"center", justifyContent:"center",
-              fontSize:"1.1rem", flexShrink:0, boxShadow:"0 4px 16px var(--accent-glow)",
-            }}>🚀</div>
             <div style={{ flex:1 }}>
-              <h1 className="gradient-text" style={{ fontSize:"1.05rem", fontWeight:900, lineHeight:1.1 }}>
-                {t.appName}
-              </h1>
+              <BrandMark as="h1" size="sm" style={{ display: "block", lineHeight: 1.15 }} />
               <p style={{ fontSize:"0.65rem", color:"var(--text-muted)", marginTop:1 }}>
-                {t.appSub} · {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US")}
+                {t.appSub} · {isLive ? (isEN ? "Mainnet · LIVE" : "Mainnet · CANLI") : (isEN ? "Devnet · Test" : "Devnet · Test")} · {new Date().toLocaleDateString(lang === "tr" ? "tr-TR" : "en-US")}
               </p>
             </div>
-            <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+            <div style={{ display:"flex", alignItems:"center", gap:6, flexWrap:"wrap", justifyContent:"flex-end" }}>
+              <AppModeToggle dense />
               <LangToggle />
               <ThemeToggle />
             </div>
@@ -436,8 +518,11 @@ export default function HomePage() {
                   )}
                 </div>
               ) : (
-                <div style={{ fontSize:"0.63rem", color:"var(--amber)" }}>
-                  🧪 {isEN ? "Demo mode" : "Demo modu"}
+                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                  <span style={{ fontSize:"0.63rem", color:"var(--amber)" }}>
+                    🧪 {isEN ? "Demo mode" : "Demo modu"}
+                  </span>
+                  <CompactWalletConnect />
                 </div>
               )}
             </div>
@@ -615,6 +700,9 @@ export default function HomePage() {
               hiring={hiring}
               hasActiveJob={!!activeJob}
               userLocation={coords}
+              showLiveWalletBanner={isLive && !publicKey}
+              liveHireBlocked={isLive && !publicKey}
+              showTestWalletHint={!isLive && !publicKey}
             />
           </div>
         )}
@@ -984,7 +1072,7 @@ export default function HomePage() {
       <main
         className="mobile-main-no-margin"
         style={{
-          flex:1, marginLeft:292,
+          flex:1, marginLeft: sidebarWidth,
           display:"flex", flexDirection:"column",
           height:"100vh", position:"relative", overflow:"hidden",
         }}
@@ -1497,7 +1585,7 @@ export default function HomePage() {
                         setSidebarTab("couriers");
                         setMobileMenuOpen(true);
                       }}
-                      className="btn-primary anim-glow"
+                      className="btn-primary"
                       style={{
                         flex:1, padding: "12px 16px", borderRadius: 14, fontSize: "0.86rem",
                         display: "inline-flex", alignItems: "center", justifyContent:"center", gap: 8, cursor: "pointer",
@@ -1549,7 +1637,7 @@ export default function HomePage() {
                     setPickMode("pickup");
                     setMobileMenuOpen(false);
                   }}
-                  className="btn-primary anim-glow"
+                  className="btn-primary"
                   style={{
                     padding: "12px 24px", borderRadius: 14, fontSize: "0.86rem",
                     display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer",
